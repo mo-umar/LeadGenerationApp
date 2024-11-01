@@ -45,8 +45,8 @@ def generate_linkedin_search_query():
         ]
     
 
-        response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        response = openai.chat.completions.create(
+        model="gpt-4o",
         messages=messages
     )
     
