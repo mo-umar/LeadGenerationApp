@@ -10,23 +10,25 @@
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-box">
-            <h1>Welcome to the Chatbot!</h1>
-            <a href="{% url 'chatbot' %}">Chatbot Interaction</a>
-           <div id="chat-log"></div>
-            <form id="chat-form" method="post">
-                {% csrf_token %}
-                {% if response %}
-                <p><strong>Bot:</strong> {{ response }}</p>
-                {% endif %}
-                <input type="text" id="user-input" name="user_input" placeholder="Your answer..." oninput="validateInput()">
-                <div id="error-message"></div>
-                <button type="submit">Send</button>
-            </form> 
+        <div class="chat-header">
+            <h2>Chat with the Bot</h2>
         </div>
+        <div id="chat-box" class="chat-box">
+            <div id="chat-log">
+                {% if response %}
+                    <!-- Display bot response -->
+                    <div class="chat-message bot-message">
+                        <p><strong>Bot:</strong> {{ response }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <form id="chat-form" method="post" class="chat-input-area">
+            {% csrf_token %}
+            <input type="text" id="user-input" name="user_input" placeholder="Type your message..." oninput="validateInput()" autocomplete="off">
+            <button type="submit">Send</button>
+        </form>
         <div id="loading-spinner" class="spinner"></div>
     </div>
-
-    
 </body>
 </html>

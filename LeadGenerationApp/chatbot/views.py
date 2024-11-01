@@ -136,7 +136,7 @@ def chatbot_interaction(request):
             messages.append({"role": "assistant", "content": "Do you have any specific criteria (e.g., company size, sector focus)?"})
 
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=messages
         )
         answer = response.choices[0].message['content']
