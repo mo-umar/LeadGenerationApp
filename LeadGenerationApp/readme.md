@@ -1,5 +1,12 @@
 ## Install Instructions
 
+Install Django
+
+`pip install django` 
+
+Install the OpenAI package
+
+`pip install openai==0.28` 
 
 ## Run the program
 
