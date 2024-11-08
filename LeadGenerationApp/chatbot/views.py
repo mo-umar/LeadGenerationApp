@@ -7,176 +7,160 @@ from lead_management.models import Lead
 import requests
 import logging
 import os
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-from django.conf import settings
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Set up logging
+logger = logging.getLogger('chatbot')
 
-# Ensure OpenAI API key from the environment is used
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Define conversation steps
-steps = [
-    "customer_description",
-    "ideal_customer_profile",
-    "ideal_position_identification",
-    "geographic_target",
-    "company_list_creation",
-    "lead_generation",
-    "refine_criteria"
-]
-
-def home(request):
-    # Render a simple template or return a basic HttpResponse
-    return render(request, 'chatbot/home.html')  # Ensure you have a 'home.html' in 'chatbot/templates/chatbot'
-
-#@login_required
-@csrf_exempt
-def chatbot_interaction(request):
-    # Handle the user's POST request and fetch a response from ChatGPT
-    if request.method == "POST":
-        user_input = request.POST.get('user_input', '').strip()
-        #chat_history = request.session['chat_history']
-
-        #if user_input:
-            #chat_history.append({'sender': 'user', 'message': user_input})
-
-        try:
-            # Process each step in the conversation flow
-            if steps[current_step] == "customer_description":
-                bot_response = "Please describe your startup. What product/service do you offer?"
-                request.session['startup_description'] = user_input
-
-            elif steps[current_step] == "ideal_customer_profile":
-                bot_response = "Describe your ideal B2B customer. What industry, challenges, or needs align with what you offer?"
-                request.session['ideal_customer_profile'] = user_input
-
-            elif steps[current_step] == "ideal_position_identification":
-                bot_response = chatgpt_generate_roles(user_input)
-                request.session['ideal_position'] = user_input
-
-            elif steps[current_step] == "geographic_target":
-                bot_response = "Which city or region would you like to target for lead generation?"
-                request.session['target_region'] = user_input
-
-            elif steps[current_step] == "company_list_creation":
-                bot_response = "Provide a list of specific companies you'd like to target or let me know if I should generate one."
-                request.session['company_list'] = user_input.split(',') if user_input else []
-
-            elif steps[current_step] == "lead_generation":
-                leads_data = chatgpt_generate_roles(request.session)
-                bot_response = format_leads_output(leads_data)
-                current_step = -1  # End conversation after lead generation
-
-            elif steps[current_step] == "refine_criteria":
-                bot_response = "Would you like to refine your search criteria? (e.g., specify company size or industry)"
-                request.session['refine_criteria'] = user_input if user_input else None
-
-        except Exception as e:
-            logger.error(f"Error during chatbot interaction: {str(e)}")
-            bot_response = "An error occurred while processing your request. Please try again or adjust your input."
-
-        #chat_history.append({'sender': 'bot', 'message': bot_response})
-        current_step += 1
-        request.session['current_step'] = current_step
-        request.session.modified = True
-
-        #return render(request, 'chatbot/chatbot.html', {'chat_history': request.session['chat_history']})
-        chat_response = get_chatbot_response(user_input)
-    return render(request, 'chatbot/chatbot.html', {"response_message": chat_response})
-
-def chatgpt_generate_roles(description):
-    prompt = f"Given the description '{description}', suggest potential decision-maker roles."
-    response = get_chatbot_response(prompt)
-    return response.get('choices')[0]['text'] if response else "I'm here to help! Please let me know more details."
-
-def generate_leads(session_data):
-    leads = []
-    for company in session_data['company_list']:
-        proxycurl_leads = proxycurl_role_lookup(company, session_data['ideal_position'], session_data['target_region'])
-        for lead in proxycurl_leads:
-            detailed_lead = salesql_contact_lookup(lead)
-            leads.append(detailed_lead)
-    return leads
-
-def proxycurl_role_lookup(company_name, role, region):
-    url = "https://nubela.co/proxycurl/api/people/role/lookup"
-    headers = {"Authorization": f"Bearer {settings.PROXYCURL_API_KEY}"}
-    params = {"company_name": company_name, "role": role, "region": region}
-
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json().get('contacts', [])
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Proxycurl API error: {str(e)}")
-        return []
-
-def salesql_contact_lookup(lead):
-    url = "https://api.salesql.com/v2/person-search"
-    headers = {"Authorization": f"Bearer {settings.SALESQL_API_KEY}"}
-    params = {
-        "first_name": lead['first_name'],
-        "last_name": lead['last_name'],
-        "company": lead['company'],
-        "location": lead.get('region', '')
-    }
-
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        contact_data = response.json()
-        return {
-            "name": f"{lead['first_name']} {lead['last_name']}",
-            "role": lead.get('job_title', ''),
-            "company": lead['company'],
-            "email": contact_data.get('email'),
-            "phone": contact_data.get('phone')
-        }
-    except requests.exceptions.RequestException as e:
-        logger.error(f"SalesQL API error: {str(e)}")
-        return {
-            "name": f"{lead['first_name']} {lead['last_name']}",
-            "role": lead.get('job_title', ''),
-            "company": lead['company'],
-            "email": None,
-            "phone": None
-        }
-
-def format_leads_output(leads):
-    if not leads:
-        return "No leads found based on the provided criteria. Please refine your search criteria or try different options."
+# Load the API key from the environment
+openai.api_key = os.getenv('OPENAI_API_KEY')
+'''
+def generate_linkedin_search_query(target_market, role, criteria):
+    """
+    Generates a LinkedIn search query based on user inputs using OpenAI's ChatCompletion API.
+    """
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that creates LinkedIn search queries."},
+        {"role": "user", "content": f"Generate a LinkedIn search query for {role} in the {target_market} industry with criteria: {criteria}."}
+    ]
     
-    formatted_text = "Here are the leads we found:\n"
-    for lead in leads:
-        contact_info = f"{lead['name']} - {lead['role']} at {lead['company']}"
-        if lead.get('email'):
-            contact_info += f", Email: {lead['email']}"
-        if lead.get('phone'):
-            contact_info += f", Phone: {lead['phone']}"
-        formatted_text += contact_info + "\n"
-    return formatted_text
+    # Use ChatCompletion API with gpt-3.5-turbo or gpt-4 model
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",  # You can also specify "gpt-4" if you have access
+        messages=messages,
+        max_tokens=50,
+        temperature=0.7
+    )
+    
+    # Extract generated content from the response
+    return response.choices[0].message['content'].strip()
+'''
+def generate_linkedin_search_query():
+    #response = openai.ChatCompletion.create(
+        #model="gpt-3.5-turbo",  # Choose the appropriate model
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "assistant", "content": "What is the desired role or position?"},
+            {"role": "assistant", "content": "Do you have any specific criteria (e.g., company size, sector focus)?"},   
+            {"role": "user", "content": "Write your specific prompt or query here."}
+        ]
+    
 
-# Helper function to fetch response from OpenAI API
-def get_chatbot_response(message):
-    try:
+        response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=messages
+    )
+    
+    # Extract the response content
+    #generated_text = response['choices'][0]['message']['content']
+    #return generated_text
+        return response.choices[0].message['content']
+
+# Define the home view
+def home(request):
+    return render(request, 'chatbot/home.html')  # Ensure you have a 'home.html' template in 'chatbot/templates/chatbot'
+
+'''def chatbot_interaction(request):
+    """
+    Handles user interaction through the chatbot, guiding users through questions
+    and generating a LinkedIn search query based on their responses.
+    """
+    session = request.session
+    if "step" not in session:
+        session["step"] = 1
+        session["target_market"] = ""
+        session["role"] = ""
+        session["criteria"] = ""
+        session.save()
+
+    if request.method == "POST":
+        user_input = request.POST.get("user_input")
+
+        # Step-by-step interaction logic
+        if session["step"] == 1:
+            session["target_market"] = user_input
+            session["step"] = 2
+            session.save()
+            return JsonResponse({"bot_reply": "What is the desired role or position?"})
+
+        elif session["step"] == 2:
+            session["role"] = user_input
+            session["step"] = 3
+            session.save()
+            return JsonResponse({"bot_reply": "Do you have any specific criteria (e.g., company size, sector focus)?"})
+
+        elif session["step"] == 3:
+            session["criteria"] = user_input
+            search_query = generate_linkedin_search_query(
+                #session["target_market"],
+                #session["role"],
+                #session["criteria"]
+            )
+            session["search_query"] = search_query
+            session["step"] = 4
+            session.save()
+            return JsonResponse({
+                "bot_reply": f"Here is the generated LinkedIn search query: '{search_query}'. "
+                             "You can edit this query or confirm to proceed.",
+                "query": search_query
+            })
+
+        elif session["step"] == 4:
+            if user_input.lower() == "confirm":
+                session["step"] = 5
+                session.save()
+                # Placeholder for LinkedIn API and SalesQL integration
+                return JsonResponse({"bot_reply": "Thank you! Proceeding with LinkedIn search."})
+            else:
+                session["search_query"] = user_input
+                session["step"] = 5
+                session.save()
+                return JsonResponse({
+                    "bot_reply": "Your query has been updated. Proceeding with LinkedIn search.",
+                    "query": user_input
+                })
+
+    return render(request, "chatbot/chatbot.html")
+'''
+def chatbot_interaction(request):
+    if request.method == "POST":
+        user_input = request.POST.get("user_input", "")
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant for finding LinkedIn profiles."},
+            {"role": "user", "content": user_input}
+        ]
+
+        # Add the next question based on current user input
+        if "role" not in user_input:
+            messages.append({"role": "assistant", "content": "What is the desired role or position?"})
+        elif "criteria" not in user_input:
+            messages.append({"role": "assistant", "content": "Do you have any specific criteria (e.g., company size, sector focus)?"})
+
         response = openai.ChatCompletion.create(
-            model="gpt-4",
-            max_tokens=100,
-            messages=[
-                {"role": "system", "content": "You are an assistant helping startups connect with decision-makers in companies."},
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": (
-                    "Could you confirm the ideal contact titles for your product? Common roles include "
-                    "'IT Director', 'Procurement Manager', 'Operations Head', etc. "
-                    "Please provide a list of companies you'd like to target, or I can suggest some based "
-                    "on your industry and region. Would you prefer specific company sizes as well?"
-                )}
-            ]
+            model="gpt-4o",
+            messages=messages
         )
-        answer = response.choices[0].message['content'].strip()
-        return answer
-    except Exception as e:
-        return f"Error fetching response: {str(e)}"
+        answer = response.choices[0].message['content']
+        return render(request, "chatbot/chatbot.html", {"response": answer})
+    return render(request, "chatbot/chatbot.html")
+
+def search_linkedin_profiles(search_query):
+    """
+    Placeholder for LinkedIn API integration. Implement LinkedIn API or scraping logic here.
+    """
+    try:
+        profiles = []  # Placeholder for LinkedIn API call or scraping
+        # LinkedIn API integration or scraping code goes here, if allowed by TOS
+        return profiles
+    except requests.exceptions.RequestException as e:
+        raise Exception("Network error while searching LinkedIn")
+
+def enrich_data_with_salesql(profiles):
+    """
+    Placeholder for SalesQL API integration to enrich LinkedIn profiles with contact information.
+    """
+    try:
+        enriched_data = []  # Placeholder for SalesQL API call
+        # Implement SalesQL API integration here
+        return enriched_data
+    except requests.exceptions.RequestException as e:
+        raise Exception("Network error while enriching data")

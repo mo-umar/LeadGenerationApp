@@ -11,28 +11,16 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables
-load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# Securely retrieve API keys
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-PROXYCURL_API_KEY = os.getenv("PROXYCURL_API_KEY")
-SALESQL_API_KEY = os.getenv("SALESQL_API_KEY")
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-l+!e3b_cxjy-mff31k#beahiatafulx-(pt-m)rn!9w@q(-%4%'
-
-# Check if any required API key is missing
-if not all([OPENAI_API_KEY, PROXYCURL_API_KEY, SALESQL_API_KEY]):
-    raise ValueError("One or more API keys are missing in the environment variables.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True

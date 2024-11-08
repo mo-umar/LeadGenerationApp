@@ -13,54 +13,22 @@
         <div class="chat-header">
             <h2>Chat with the Bot</h2>
         </div>
-         <!-- Chat display area -->
-    <div id="chat-history"></div>
-
-    <!-- chat.html -->
-    {% if initial_prompt %}
-    <div class="initial-prompt">{{ initial_prompt }}</div>
-    {% endif %}
-    <!-- Chat content here -->
-     
-    <!-- Display initial or response message from Django view -->
-    {% if response_message %}
-        <p id="bot-response">{{ response_message }}</p>
-    {% endif %}
-    
-
-    <!-- Chat form -->
-    <form method="post" id="chat-form">
-        {% csrf_token %}
-        <input type="text" name="message" placeholder="Enter your message here" required>
-        <button type="submit">Send</button>
-    </form>
-
-    <script>
-        // Clear chat history on page load
-        window.addEventListener("load", function() {
-            document.getElementById("chat-history").innerHTML = "";  // Clear chat area
-        });
-
-        // Handle form submission without storing messages
-        document.getElementById("chat-form").onsubmit = function(event) {
-            event.preventDefault();
-            const messageInput = event.target.message;
-            const chatHistory = document.getElementById("chat-history");
-
-            // Add user message to chat history display
-            const userMessage = document.createElement("p");
-            userMessage.textContent = "You: " + messageInput.value;
-            chatHistory.appendChild(userMessage);
-
-            // Simulate a bot response using the response from Django view
-            const botResponse = document.getElementById("bot-response").textContent;
-            const botMessage = document.createElement("p");
-            botMessage.textContent = "Bot: " + botResponse;
-            chatHistory.appendChild(botMessage);
-
-            // Clear input
-            messageInput.value = "";
-        };
-    </script>
+        <div id="chat-box" class="chat-box">
+            <div id="chat-log">
+                {% if response %}
+                    <!-- Display bot response -->
+                    <div class="chat-message bot-message">
+                        <p><strong>Bot:</strong> {{ response }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <form id="chat-form" method="post" class="chat-input-area">
+            {% csrf_token %}
+            <input type="text" id="user-input" name="user_input" placeholder="Type your message..." oninput="validateInput()" autocomplete="off">
+            <button type="submit">Send</button>
+        </form>
+        <div id="loading-spinner" class="spinner"></div>
+    </div>
 </body>
 </html>
